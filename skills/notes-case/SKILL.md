@@ -49,21 +49,23 @@ description: >-
 
 **误触发的恢复**:如果你已经进了 skill,在写盘前必有"预清单表格"卡点。用户说"先别记"/"等下再说"/"不是这个意思"——立刻退出,**已生成的目录/文件如果还没写就别写;若已 `mkdir` 但未写内容就 `rmdir`**。不要 commit、不要动 git。完整退场后,**回到调试上下文继续**,不要要求用户重新描述卡在哪。
 
-## 推送授权(硬规则)
+## 推送规则(硬规则)
 
-> **不要在未经用户当次明确同意的前提下执行 `git push`**。case 数据仓含硬件细节,推错地方/推错时机都不可逆。
+> **永远不要执行 `git push`**。push 操作由用户本人完成,skill 不做、也不问。
 
-- **`git commit` 可以自动做**(新建/更新/收尾/汇总流程里写的提交,默认就 commit,无需问)——本地提交是安全的,即使写错也能 amend/reset。
-- **`git push` 必须每次显式问一次**:commit 完后用一句话报告"本地已提交 \<sha\>,要不要 push?",等用户回答 yes 才执行。哪怕用户上一次 push 同意了,这一次也要再问——单次同意不延续到下次。
-- 例外:用户**本轮消息里**就明说"提交并推送"/"commit and push"/"推上去"等等价指令时,可一次性 commit+push 不再二次确认。
-- 不要写 `git push 2>/dev/null || ...` 这种"静默尝试推一下"的兜底,因为它绕过了用户决策。
+- **`git commit` 可以自动做**(新建/更新/收尾/汇总流程里写的提交,默认就 commit,无需问)——本地提交是安全的。
+- **`git push` 一律不执行**:既不要写在脚本里,也不要主动问"要不要 push"——用户已经定下这条规则,问就是噪声。
+- 例外:用户**本轮消息里**明说"提交并推送"/"commit and push"/"推上去"等等价指令时,才执行 push,执行完报告结果。
+- 不要写 `git push 2>/dev/null || ...` 这种"静默尝试推一下"的兜底。
 
 写命令时模式固定如下:
 
 ```bash
 cd "$DEVNOTES_DIR" && git add -A && git commit -q -m "<msg>"
-git log --oneline -1   # 报告 sha 给用户,然后等用户决定 push
+git log --oneline -1   # 报告 sha,完事
 ```
+
+报告时一句话即可:"本地已提交 \<sha\>"——不要追问 push。
 
 ## 关键路径(全部动态解析,不要硬编码)
 
@@ -176,7 +178,7 @@ mkdir -p "$DEVNOTES_DIR/$SDK/active/<目录名>/logs"
 cd "$DEVNOTES_DIR" && git add -A && git commit -q -m "<sdk>: new <目录名> — <一句话现状>"
 git log --oneline -1
 ```
-报告 commit sha 给用户,**然后问一句"要不要 push?"——按推送授权硬规则,push 必须显式同意才执行**。
+报告 sha 即可。**按推送规则:不 push、不问 push。**
 
 ## 更新现有 case(边查边补)
 
@@ -192,7 +194,7 @@ git log --oneline -1
    - **持续抓到的日志(串口/ADB/dmesg)→ 关键步骤**:先确认它对应哪次改动(接着上一轮就 `t<N+1>`),按 `logs/t<N>-<标识>-<类型>.txt` 存,并在 `trace.md` 加/补一条 `t<N> 改了X → 结果Y → 日志 logs/t<N>-...`,做到**改动与日志一一对应**;原始大段日志只进 logs/,trace.md 里只留结论
    - 复现状态有变(偶发→稳定复现/已解决)就同步 `case.md` 顶部字段
 3. 若进展改变了 index 的"一句话现状",同步更新 index 那一行。
-4. **提交备份**: `cd "$DEVNOTES_DIR" && git add -A && git commit -q -m "<sdk>: update <目录名> — <补了什么>"`,然后报告 sha 给用户,**按推送授权硬规则**问要不要 push,别直接 push。
+4. **提交备份**: `cd "$DEVNOTES_DIR" && git add -A && git commit -q -m "<sdk>: update <目录名> — <补了什么>"`,报告 sha。**不 push、不问 push**。
 
 ### 自动从当前对话提取(无需用户逐条口述)
 
@@ -217,7 +219,7 @@ git log --oneline -1
    - 用户陈述句("PLL lock 成功""换显示器仍黑")→ `findings`
    - 用户带"可能/也许/或许/感觉是/可能是 vop 时序问题"等不确定措辞 → `next` 的"待验证假设",**附"由用户口头提出"标注**,不要升格为 findings
    - 用户的下一步打算("接下来想试 X")→ `next` 的"接下来要试"
-7. 确认/默许后按上面的路由写入各文件,同步 index 现状行,`git commit`(本地)——然后按推送授权硬规则问用户要不要 push。
+7. 确认/默许后按上面的路由写入各文件,同步 index 现状行,`git commit`(本地)。**不 push、不问 push。**
 
 > 自动提取≠瞎猜:提取的是用户在对话里**已经说过/做过**的事,只是替他归纳归档;凡是对话里没有依据的字段(比如根因还没定),保持留空,不要替他下结论。
 
@@ -240,7 +242,7 @@ git log --oneline -1
    cd "$DEVNOTES_DIR" && git add -A && git commit -m "<sdk>: done <目录名> — <一句话结论>"
    git log --oneline -1
    ```
-   报告 sha,**按推送授权硬规则问用户要不要 push**——收尾这一步尤其要确认,因为是阶段性归档。
+   报告 sha 即可。**不 push、不问 push**——push 由用户自己完成。
 
 ## 汇总多个 case 成知识库 / 复盘文档
 
@@ -252,7 +254,7 @@ git log --oneline -1
    - 顶部一个目录/索引表(case 名 → 一句话结论 → 链接)
    - 每个 case 一小节:问题 / 根因 / 方案(带 commit)/ 避坑要点,末尾链接回原 case
    - 若多个 case 有共性(同一子系统反复出问题),单开一段"共性与规律"——这是知识库比单篇总结更值钱的地方
-4. 本地提交: `cd "$DEVNOTES_DIR" && git add -A && git commit -m "digest: <范围> 汇总"`,报告 sha,**按推送授权硬规则问用户要不要 push**。
+4. 本地提交: `cd "$DEVNOTES_DIR" && git add -A && git commit -m "digest: <范围> 汇总"`,报告 sha。**不 push、不问 push**。
 
 ## 注意
 
