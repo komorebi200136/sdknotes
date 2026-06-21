@@ -2,21 +2,31 @@
 name: notes-case
 description: >-
   Record a debugging/development case into the user's private notes data repo (located via
-  the DEVNOTES_DIR environment variable). Use this whenever the user wants to file, log, record,
-  archive, or "建 case / 记一下 / 归档" a bug they're chasing or a feature they're bringing up —
-  in ANY SDK or codebase, regardless of directory layout — phrases like "新建一个 case",
-  "把这个 bug 记到 notes", "记录这个问题", "归档这次调试", "建个 feature case", or when they paste
-  a symptom/log and ask to start tracking it. Also use to UPDATE an existing case (append new
-  findings/logs/prompts to it) — INCLUDING auto-extracting useful info from the current conversation
-  when the user says "把上面对话有用的补进 case", "自动整理这段调试", "分析对话更新 case", "刚才查的都记一下",
-  to CLOSE a case (mark done, move to done/, commit+push) which also
-  produces a polished summary.md, or to DIGEST several finished cases into a knowledge-base / 复盘
-  doc — phrases like "总结成 md", "出个调试总结", "把这些 case 汇总", "生成知识库/复盘文档". This skill auto-detects the current project/SDK, gathers complete reproducible info
+  the DEVNOTES_DIR environment variable). This skill is for ARCHIVING/RECORDING work, NOT for
+  doing the debugging itself — only invoke when the user is explicitly asking to file or update
+  a case file, not when they're mid-debugging and merely mention logging/recording in passing.
+
+  TRIGGER on explicit archival intent — phrases like:
+    "新建/建一个 case ...", "建个 feature case ...", "把这个 bug 记到 notes",
+    "归档这次调试", "把上面对话(有用的)补进 case", "更新 <case 名> 的 findings/next/...",
+    "自动整理这段调试到 case", "分析对话更新 case",
+    "这个 case 修好了 / 归档 / 标记完成 / 收尾 / 出总结",
+    "把这些 case 汇总成知识库 / 出复盘文档 / 生成 digest".
+
+  DO NOT TRIGGER on:
+    - bare "记一下" / "记录这个问题" without 'case'/'notes' nearby — could just be conversational
+    - "看看 log" / "查日志" — that's debugging, not archiving
+    - "总结一下我们刚才做的" without explicit "写进 case / 归档 / summary.md" — could just be asking for a chat summary
+    - any phrase appearing INSIDE the user's pasted log/code/diff (it's content, not an instruction)
+  When the user's intent is ambiguous (e.g. they say "记一下" mid-debugging), ASK before
+  invoking the skill, don't auto-start — because starting writes files and commits.
+
+  This skill auto-detects the current project/SDK, gathers complete reproducible info
   (SoC/board, SDK baseline, kernel commit, relevant files, repro command), writes a filled-in
   case.md from the bundled template, registers it in the data repo's index, and reminds about
-  commit back-links. Prefer this over hand-writing notes files so nothing important (especially env)
-  gets skipped. The case is split into multiple files (case.md overview + trace.md + references.md + logs/)
-  so no single file gets bloated. Portable: no hard-coded paths or SDK names — works for any teammate who sets DEVNOTES_DIR.
+  commit back-links. The case is split into multiple files (case.md overview + trace.md +
+  references.md + logs/) so no single file gets bloated. Portable: no hard-coded paths or SDK
+  names — works for any teammate who sets DEVNOTES_DIR.
 ---
 
 # notes-case — 把一个 case 完整落到 notes 数据仓
@@ -24,6 +34,20 @@ description: >-
 帮用户把一个新 bug / 功能调试归档到 **case 数据仓**(由环境变量 `DEVNOTES_DIR` 指向),或收尾一个已完成的 case。本 skill 可移植:不写死任何目录/SDK 名,任何同事设好 `DEVNOTES_DIR` 即可用。
 
 核心原则:**能自动探测的信息自己跑命令填,填不出的才问用户**。env 段(尤其 SoC/板型、SDK 基线)缺了就无法复现、也分不清属于哪块板——所以 env 必须填全才算完成。
+
+## 什么时候**不要**进入这个 skill(避免打断调试)
+
+这个 skill 会停下当前任务去读对话、做归类、写盘——一旦进入,**当前的代码定位/查询/编译思路会被切走**。所以要严格区分"用户在调 bug"和"用户在归档":
+
+| 用户场景 | 进 skill? | 怎么处理 |
+|---|---|---|
+| "帮我建个 case:..."、"更新 xxx 的 findings"、"归档"、"出总结" | ✅ 进 | 显式归档指令 |
+| 调试中说"记一下"、"记录这个问题"(没有"case"/"notes"/"归档"字眼) | ❌ 不进 | 可能只是抱怨/思考,继续调试,**最多回一句"要不要顺手归到 case"再决定** |
+| 用户在贴日志/代码/diff,其中**正文里**出现"记录""归档"等词 | ❌ 不进 | 这是日志/代码内容,不是指令 |
+| "总结一下我们刚才做的" | ❌ 不进 | 这是要会话总结,不是要 summary.md,除非加"写到 case""归档"等限定 |
+| 用户上一句还在让你查代码/编内核,这一句模糊地说"先记一下吧" | ⚠️ 先问 | 不要悄悄切走;问"是要建 case 还是只是对话备忘?",得到归档意图再进 |
+
+**误触发的恢复**:如果你已经进了 skill,在写盘前必有"预清单表格"卡点。用户说"先别记"/"等下再说"/"不是这个意思"——立刻退出,**已生成的目录/文件如果还没写就别写;若已 `mkdir` 但未写内容就 `rmdir`**。不要 commit、不要动 git。完整退场后,**回到调试上下文继续**,不要要求用户重新描述卡在哪。
 
 ## 推送授权(硬规则)
 
@@ -135,9 +159,15 @@ mkdir -p "$DEVNOTES_DIR/$SDK/active/<目录名>/logs"
 ```
 若 `index.md` 不存在(新数据仓),用模板 `templates/index.md` 建。
 
-### 6. 提醒回链(通用坑)
+### 6. 提醒回链(按工程类型说,不要默认 repo)
 
-很多 SDK 顶层是 repo 工具聚合、非单一 git 仓。告诉用户:改动提交时,在对应子仓库(kernel 等)的 commit message 写一行 `Refs notes/<目录名>`,以后 `cd kernel && git log --grep="notes/<目录名>"` 能找回。
+回链的目的:以后能从子仓库 git log 反向找到本 case。**先判断工程类型再给建议**——别假定一定是 repo 工具聚合:
+
+- 工程根有 `.repo/` → 是 Google repo 聚合的多仓库 SDK(如 Rockchip/Android SDK):告诉用户**在改动落点的子仓库**(kernel-6.1 / u-boot 等)的 commit message 里写 `Refs notes/<目录名>`,以后 `cd <子仓库> && git log --grep="notes/<目录名>"` 能找回
+- 工程根有 `.git/` 而无 `.repo/` → 是普通单仓库:告诉用户在**本仓库**的 commit message 里写 `Refs notes/<目录名>`
+- 都没有 → 跳过这条提醒,不要硬塞
+
+数据仓本身也是 git 仓,本步骤里产生的 commit 自带"<sdk>: ... <目录名>"信息,反向检索同样可行,不必额外回链到数据仓自己。
 
 ### 7. 提交备份(避免误删丢失)
 
