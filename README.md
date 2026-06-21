@@ -1,8 +1,20 @@
 # notes-kit — Agent 调试归档工具包(可共享)
 
-给用 Claude Code / Codex 等 agent 调 bug、调功能的人用的一套**通用**归档工具:一个 `notes-case` skill + 一份 case 模板。可移植——不写死任何目录或 SDK 名,**任何同事在任何 SDK 里都能用**。
+给用 **Claude Code / Codex CLI / opencode** 等 agent 调 bug、调功能的人用的一套**通用**归档工具:一个 `notes-case` skill + 一份 case 模板。可移植——不写死任何目录或 SDK 名,**任何同事在任何 SDK 里都能用**。
 
 本仓只含工具(模板/skill),不含任何人的 case 数据。case 数据放各自的私有仓(见下)。
+
+## 支持的 agent
+
+| Agent | 触发方式 | 自动化程度 |
+|---|---|---|
+| **Claude Code** | 装到 `~/.claude/skills/`,description 自动识别意图触发 | 全自动 |
+| **Codex CLI** | 把 SKILL.md 当 prompt 文档,在每次会话开头或 `AGENTS.md` 里引用 | 半自动(显式引用) |
+| **opencode** | 同上,作为 instruction 文件加载 | 半自动 |
+| **其他能跑 bash + 读写文件的 AI agent** | 让 agent 读 SKILL.md 后照流程做 | 半自动 |
+
+SKILL.md 本质是一份**工程化 prompt**——里面是 shell 命令 + 文件写入 + 判断逻辑,**没有任何 Claude Code 专有 API**,所以任何能执行 bash + 读写文件的 agent 都能跑通它,只是不能像 Claude Code 那样靠 description 自动触发。
+
 
 ## 两个仓的分工
 
@@ -13,25 +25,75 @@
 
 skill 通过环境变量 `DEVNOTES_DIR` 找到你的 case 数据仓,所以两者解耦。
 
-## 安装(每位同事一次)
+## 安装
+
+每位同事每个工具一次。`DEVNOTES_DIR` 是共用的——同一台机器上不管用哪个 agent,case 都进同一个数据仓。
+
+### 通用准备(所有 agent 都要)
 
 ```bash
 # 1. 取得工具包
 git clone <notes-kit 仓地址> ~/notes-kit     # 或放任意位置
 
-# 2. 把 skill 整个目录复制到 Claude 全局 skills 目录
-cp -r ~/notes-kit/skills/notes-case ~/.claude/skills/
-
-# 3. 准备自己的 case 数据仓（私有），并告诉 skill 它在哪
+# 2. 准备自己的 case 数据仓（私有），并告诉 skill 它在哪
 mkdir -p ~/my-dev-notes && cd ~/my-dev-notes && git init
 echo 'export DEVNOTES_DIR=~/my-dev-notes' >> ~/.bashrc && source ~/.bashrc
 ```
 
+### Claude Code(全自动)
+
+```bash
+# 把 skill 整个目录复制到 Claude 全局 skills 目录
+cp -r ~/notes-kit/skills/notes-case ~/.claude/skills/
+```
+
 > 复制(而非软链)是有意为之:更新工具时重新 `cp -r` 覆盖即可,简单明确。
+
+装完后,Claude Code 看到符合 description 的话自动触发,无需手动引用。
+
+### Codex CLI(半自动 — 用 AGENTS.md 永久引用)
+
+Codex 没有 Claude Code 的 skill auto-trigger 机制,但它会读取**当前工程根目录的 `AGENTS.md`** 作为系统指令。在每个你想用 notes-case 的 SDK 工程根加一行:
+
+```bash
+# 在每个 SDK 工程根(或全局 ~/.codex/AGENTS.md)
+cat >> AGENTS.md << 'EOF'
+
+## 调试归档
+
+需要把 bug/调试归档时,**按 ~/notes-kit/skills/notes-case/SKILL.md 的流程执行**。
+触发词、白/黑名单、写盘前预清单、push 规则等全部以该 SKILL.md 为准。
+EOF
+```
+
+之后在 Codex 会话里说"建个 case:...""把上面对话补进 case"等,它会去读 SKILL.md 再按流程做。
+
+### opencode(半自动)
+
+opencode 支持 `AGENTS.md` / 自定义 instruction 文件,做法同 Codex:在工程根或全局 instruction 文件里加同一段引用。
+
+也可以**会话开头一次性引用**(更直接):
+
+```
+请阅读 ~/notes-kit/skills/notes-case/SKILL.md,按里面的流程帮我归档调试 case。
+```
+
+之后整个会话里说归档相关的话,它就按 skill 流程执行。
+
+### 任何其他能跑 bash 的 AI agent
+
+每次会话开头说一句:
+
+```
+请先读 ~/notes-kit/skills/notes-case/SKILL.md,
+后续我说到 "建 case / 归档 / 把对话补进 case" 等指令时,按这个文档的流程做。
+```
 
 ## 使用 — 提示词手册
 
-在**任意** SDK / 代码库目录里启动 Claude Code,用日常话描述意图。skill 用"白名单+黑名单"判断要不要进入归档流程,**误触发就会打断你正在调试的思路**——所以提示词写法值得花一分钟搞懂。
+在**任意** SDK / 代码库目录里启动你的 agent(Claude Code / Codex / opencode 等),用日常话描述意图。**Claude Code 会按 description 自动触发**;Codex / opencode 等其他 agent 需要按上面"安装"那节里配好 `AGENTS.md` 或会话开头引用 SKILL.md,然后**同样的提示词全部适用**——下面的白/黑名单、速查表跨工具通用。
+
+skill 用"白名单+黑名单"判断要不要进入归档流程,**误触发就会打断你正在调试的思路**——所以提示词写法值得花一分钟搞懂。
 
 ### TL;DR — 一句话规则
 
@@ -145,9 +207,14 @@ skill 会自动:识别当前工程/SDK(子目录名由你确认)→ 探测内核
 ## 更新工具(模板/skill 会演进)
 
 ```bash
-cd ~/notes-kit && git pull              # 拉最新
-cp -r ~/notes-kit/skills/notes-case ~/.claude/skills/   # 重新覆盖安装
+cd ~/notes-kit && git pull              # 拉最新——所有 agent 共享这一份源
 ```
+
+- **Claude Code 用户**:还要重新覆盖安装到全局 skills 目录:
+  ```bash
+  cp -r ~/notes-kit/skills/notes-case ~/.claude/skills/
+  ```
+- **Codex CLI / opencode 用户**:`AGENTS.md` 引用的是 `~/notes-kit/skills/notes-case/SKILL.md` 绝对路径,`git pull` 完即生效,**无需额外操作**。
 
 改进了模板或 skill 想分享:在本仓改 → commit → push,其他人 `git pull` 即得。
 

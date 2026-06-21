@@ -74,7 +74,7 @@ git log --oneline -1   # 报告 sha,完事
   : "${DEVNOTES_DIR:?未设置 DEVNOTES_DIR——请先 export DEVNOTES_DIR=<你的 case 数据仓路径>}"
   ```
   若未设置,停下来提示用户在 `~/.bashrc` 里加 `export DEVNOTES_DIR=...` 并 source,别瞎猜路径。
-- **模板目录**: `~/.claude/skills/notes-case/templates/`(含 case.md / trace.md / references.md / summary.md / index.md / digest.md)。
+- **模板目录**: Claude Code 装到 `~/.claude/skills/notes-case/templates/`;其它 agent(Codex/opencode 等)用源仓路径 `~/notes-kit/skills/notes-case/templates/`(若你 clone 到别处,自行替换)。含 `case.md / trace.md / references.md / summary.md / index.md / digest.md` 共 6 个模板。
 - **当前工程/SDK 名**: 新建/更新时**由用户手动指定**(见第 1 步,探测值仅作建议)。
 - **case 落点**: `$DEVNOTES_DIR/<sdk>/active/<目录名>/`,内部按功能拆成多文件:
   - `case.md` — 概览:元信息/env/hw/现象/prompts/findings/decisions/patch/verify/next
@@ -230,7 +230,7 @@ git log --oneline -1
 用户说"修好了 / 归档 / 标记完成 / 总结一下"时:
 
 1. 确认 case.md 的 verify 段已填(实测步骤+结果+残留边界)、patch 段有 commit sha,复现状态改 `已解决`。缺了先补问。
-2. **生成调试总结 `summary.md`**:读模板 `~/.claude/skills/notes-case/templates/summary.md`,从 `case.md` + `trace.md` 提炼写进 case 目录的 `summary.md`——TL;DR + 问题 + 根因 + 解决方案 + 验证 + 避坑经验。这是面向复盘/分享的成品:**连贯成文、去掉占位**,既讲清"怎么解决的"(给人复用)又留下"避坑教训"(给人省时)。
+2. **生成调试总结 `summary.md`**:读模板 `<模板目录>/summary.md`(见上文"关键路径"——Claude Code 走 `~/.claude/skills/...`,其它 agent 走 `~/notes-kit/...`),从 `case.md` + `trace.md` 提炼写进 case 目录的 `summary.md`——TL;DR + 问题 + 根因 + 解决方案 + 验证 + 避坑经验。这是面向复盘/分享的成品:**连贯成文、去掉占位**,既讲清"怎么解决的"(给人复用)又留下"避坑教训"(给人省时)。
 3. 移动并按年月归档(年月用今天):
    ```bash
    mkdir -p "$DEVNOTES_DIR/$SDK/done/<YYYY-MM>"
