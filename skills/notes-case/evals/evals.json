@@ -1,0 +1,95 @@
+{
+  "skill_name": "notes-case",
+  "purpose": "回归测试集 — 改 description 后人肉对照一遍,确认触发判定没退化。不跑 skill-creator 的完整 eval,只用作 manual checklist。",
+  "expected_behavior_values": {
+    "trigger": "应直接进入 skill 流程(可能先做问答,但意图已明确)",
+    "no-trigger": "不应进 skill,按普通调试/对话回应",
+    "ask-first": "应先反问'是要归档还是只是会话备忘',得到归档意图才进"
+  },
+  "evals": [
+    {
+      "id": 1,
+      "axis": "white-list/NEW",
+      "prompt": "帮我建个 case:K7 板 HDMI 上电偶发黑屏",
+      "expected_behavior": "trigger",
+      "reason": "明确含 'case' + '建' 动词 → 标准新建意图"
+    },
+    {
+      "id": 2,
+      "axis": "white-list/UPDATE",
+      "prompt": "更新 hdmi 那个 case 的 findings:不是 EDID 问题,失败时也能读到完整 EDID",
+      "expected_behavior": "trigger",
+      "reason": "明确含 'case' + 'findings' 段名 + 内容 → UPDATE 指定段"
+    },
+    {
+      "id": 3,
+      "axis": "white-list/AUTO-EXTRACT",
+      "prompt": "把上面对话有用的补进 case",
+      "expected_behavior": "trigger",
+      "reason": "标准自动提取入口语;skill 应回看本轮对话,先给预清单再写盘"
+    },
+    {
+      "id": 4,
+      "axis": "white-list/CLOSE",
+      "prompt": "这个 case 修好了,归档并出总结",
+      "expected_behavior": "trigger",
+      "reason": "含 'case'+'归档'+'总结' 三重触发词 → 走 CLOSE 流程,生成 summary.md"
+    },
+    {
+      "id": 5,
+      "axis": "white-list/DIGEST",
+      "prompt": "把 rk3576 以太网相关的 case 汇总成复盘文档",
+      "expected_behavior": "trigger",
+      "reason": "含 '汇总'+'case'+'复盘文档' → 走 DIGEST,生成 digests/<主题>.md"
+    },
+    {
+      "id": 6,
+      "axis": "white-list/FORCE",
+      "prompt": "用 notes-case skill 记录:刚才把 reset-delay 从 10ms 改成 50ms 后 PHY 就能起来了",
+      "expected_behavior": "trigger",
+      "reason": "显式点名 skill,任何模糊触发都被覆盖,直接进入"
+    },
+    {
+      "id": 7,
+      "axis": "black-list/no-case-keyword",
+      "prompt": "记一下:HDMI 黑屏 4K 概率约 30%,1080p 不黑",
+      "expected_behavior": "no-trigger",
+      "reason": "只有 '记一下',无 'case'/'notes'/'归档'/'summary' 字眼 → 当口头表达或会话备忘,继续调试"
+    },
+    {
+      "id": 8,
+      "axis": "black-list/debugging-action",
+      "prompt": "看看这段 dmesg 啥意思:[ 2.612] phy phy-fdc40000.hdmiphy.0: PHY lock TIMEOUT after 100us",
+      "expected_behavior": "no-trigger",
+      "reason": "'看看 log'/'分析日志' 是调试动作,不是归档 → 按常规分析这段日志,不写盘"
+    },
+    {
+      "id": 9,
+      "axis": "black-list/chat-summary",
+      "prompt": "总结一下我们刚才调的内容,我要给老板汇报",
+      "expected_behavior": "no-trigger",
+      "reason": "要的是会话总结,不是 summary.md;没加 '写到 case/归档/summary.md' 限定 → 直接给口头总结"
+    },
+    {
+      "id": 10,
+      "axis": "black-list/keyword-in-content",
+      "prompt": "帮我看这段代码:switch (state) { case HDMI_INIT: /* 记录初始化时间 */ break; }",
+      "expected_behavior": "no-trigger",
+      "reason": "'case' 和 '记录' 都出现在代码正文内,是内容不是指令 → 按代码分析回应"
+    },
+    {
+      "id": 11,
+      "axis": "ambiguous/ask-first",
+      "prompt": "先记一下吧",
+      "expected_behavior": "ask-first",
+      "reason": "调试中模糊指令,无对象、无 'case' → 先问'是要建 case 归档,还是只是对话备忘?',得到归档意图才进"
+    },
+    {
+      "id": 12,
+      "axis": "ambiguous/ask-first",
+      "prompt": "把这个搞清楚,然后记到 notes 里",
+      "expected_behavior": "ask-first",
+      "reason": "含 'notes' 关键词但意图复合('先搞清楚再记')——可能要的是先调试再归档;应先问'要不要现在先调,后续再归档?',避免立刻切到归档流程打断"
+    }
+  ]
+}
