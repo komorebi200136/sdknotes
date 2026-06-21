@@ -29,15 +29,31 @@ echo 'export DEVNOTES_DIR=~/my-dev-notes' >> ~/.bashrc && source ~/.bashrc
 
 > 复制(而非软链)是有意为之:更新工具时重新 `cp -r` 覆盖即可,简单明确。
 
-## 使用
+## 使用 — 用提示词调用
 
-在**任意** SDK / 代码库目录里启动 Claude Code,说一句:
+在**任意** SDK / 代码库目录里启动 Claude Code,用日常话描述意图即可触发,各场景示例提示词:
 
-- “帮我新建一个 case：<现象/目标>”
-- “把这个 bug 记到 notes”
-- “这个 case 修好了，归档”
+**新建 case**
+- “帮我新建一个 case：K7 板 HDMI 上电偶发黑屏”
+- “记录一个 bug：…” / “这个功能要调,先建个 feature case：…”
 
-skill 会自动:识别当前工程/SDK → 探测内核 commit 等 → 追问缺失的 env → 用模板写好 case → 登记 index → 提醒在子仓库 commit 里写 `Refs notes/<case>` 回链。收尾时自动 `git commit && push` 到你的数据仓备份。
+**调试中更新 / 补充**
+- “把刚查到的补到 hdmi 那个 case 的 findings”
+- “这是改了 reset 时序后抓的日志,记一轮 trace”(可附日志)
+- “接下来打算试 X,记到 next” / “把这个 datasheet 链接加到 references”
+
+**持续抓日志(带轮次)**
+- “这是 t3,改成 20ms 后还是黑,日志:…”(说清是第几轮、改了什么,日志才能和改动对上)
+
+**收尾 + 生成总结**
+- “这个 case 修好了,归档并出总结” / “给 xxx case 生成 summary”
+
+**汇总知识库**
+- “把 rk3576 以太网相关的 case 汇总成复盘文档” / “生成 HDMI 主题知识库”
+
+> 触发不灵时直接点名:“**用 notes-case skill** 记录…”。
+
+skill 会自动:识别当前工程/SDK(子目录名由你确认)→ 探测内核 commit / 构建命令等 → 追问缺失的 env → 用模板写好 case 文件组 → 登记 index → 提醒在子仓库 commit 里写 `Refs notes/<case>` 回链。新建与收尾都会 `git commit`(配了 remote 则 push)备份。
 
 ## 更新工具(模板/skill 会演进)
 
@@ -48,6 +64,16 @@ cp -r ~/notes-kit/skills/notes-case ~/.claude/skills/   # 重新覆盖安装
 
 改进了模板或 skill 想分享:在本仓改 → commit → push,其他人 `git pull` 即得。
 
-## case 模板里有什么
+## case 长什么样(多文件解耦)
 
-见 [skills/notes-case/templates/case.md](skills/notes-case/templates/case.md)。要点:env(SoC/板型/SDK 基线/内核 commit/复现命令)、硬件信息、现象+复现概率、有效 prompt、排查/决策、改动落点、验证。针对嵌入式 + agent 协作场景设计,字段通用、不绑定具体芯片。
+一个 case 是一个目录,按功能拆成多文件,避免单文件臃肿:
+
+| 文件 | 内容 |
+|------|------|
+| `case.md` | 概览:env / 硬件 / 现象 / 有效 prompt / 排查结论 / 决策 / 改动 / 验证 / 下一步 |
+| `trace.md` | 调试过程:逐轮 `t<N>` 改动 + 对应日志,改动与 log 一一对应 |
+| `references.md` | datasheet / 文档 / commit / issue 链接 |
+| `logs/` | 原始日志 / diff / 截图(`t<N>-…` 命名) |
+| `summary.md` | 收尾时生成的精炼总结(给复盘/分享) |
+
+数据仓根另有 `index.md`(全局索引)和 `digests/`(多 case 汇总知识库)。所有模板见 [skills/notes-case/templates/](skills/notes-case/templates/),字段通用、不绑定具体芯片。
