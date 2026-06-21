@@ -54,6 +54,8 @@ for k in "$root"/kernel "$root"/kernel-* ; do
 done
 # 若是 Rockchip 风格 SDK，顺带探测当前板型（其它 SDK 无此文件，自然跳过）
 cat "$root"/device/.BoardConfig.mk 2>/dev/null | grep -iE "DEFCONFIG|TARGET_PRODUCT" || true
+# 构建方式：工程根有 build.sh（Rockchip 等 SDK）就建议标准编译流程
+[ -e "$root/build.sh" ] && echo "构建命令(建议): cd $root && ./build.sh <defconfig>  # 选板型后 ./build.sh 全量，或 ./build.sh kernel 等增量"
 ```
 
 **问用户要 `$SDK`**:展示上面"已有子目录"和"建议名",让用户选一个已有的、或输入新的。用户给定后才记为 `$SDK`。其余探测不到的字段(板型/SDK 基线/复现命令等)同样退回问用户,别瞎填。
@@ -66,7 +68,7 @@ cat "$root"/device/.BoardConfig.mk 2>/dev/null | grep -iE "DEFCONFIG|TARGET_PROD
 - **现象 / 目标**(必填): bug 写预期 vs 实际 + **复现概率/触发条件**(间歇性 bug 尤其要问"多大概率、什么条件触发");feature 写要实现什么 + 验收标准
 - **SoC / 板型 + SDK 基线**(必填,探测不到才问)
 - **相关 DTS / 源文件**(嵌入式 bug 几乎必填)
-- **复现 / 构建命令**(必填)
+- **复现 / 构建命令**(必填): 工程根有 `build.sh`(Rockchip 风格 SDK)时,**编译在 SDK 根目录进行**——先 `cd <SDK根> && ./build.sh <defconfig>` 选板型,再 `./build.sh` 全量编译(或 `./build.sh kernel`/`uboot` 等增量);其它 SDK 按其构建方式填
 - **给 agent 的有效指令**: 尤其那条约束 agent 别乱改的范围限定 prompt——最值得存
 - 硬件 bug 再问: 原理图页码、关键网络/引脚、外设型号(填进 hw 段)
 - 已有的 findings / 决策 / 改动落点: 有就填,没有留空待补
