@@ -28,32 +28,35 @@ description: >-
   ```
   若未设置,停下来提示用户在 `~/.bashrc` 里加 `export DEVNOTES_DIR=...` 并 source,别瞎猜路径。
 - **模板**: `~/.claude/skills/notes-case/templates/case.md`(随本 skill 一起安装)。
-- **当前工程/SDK 名**: 见下方第 1 步自动识别。
+- **当前工程/SDK 名**: 新建/更新时**由用户手动指定**(见第 1 步,探测值仅作建议)。
 - **case 落点**: `$DEVNOTES_DIR/<sdk>/active/<目录名>/`
 - **索引**: `$DEVNOTES_DIR/index.md`
 
 ## 新建一个 case
 
-### 1. 先自动探测,减少向用户提问
+### 1. 确定 SDK 子目录(手动指定)+ 自动探测其余 env
+
+**case 归到哪个 SDK 子目录,由用户手动确认/输入——不自动采用探测值**,避免在 `kernel` 等子仓库里启动时落错目录。先给出参考信息让用户拍板:
 
 ```bash
 : "${DEVNOTES_DIR:?未设置 DEVNOTES_DIR}"
-# 工程根 = 从当前目录向上找到第一个含 .repo/.git/build.sh/Makefile 的目录
+# 向上找工程根（仅用于探测内核/板型，并给个 SDK 名建议，不直接当落点）
 root=$PWD
 while [ "$root" != "/" ]; do
-  if [ -e "$root/.repo" ] || [ -d "$root/.git" ] || [ -e "$root/build.sh" ]; then break; fi
+  if [ -e "$root/.repo" ] || [ -e "$root/build.sh" ] || [ -d "$root/.git" ]; then break; fi
   root=$(dirname "$root")
 done
-SDK=$(basename "$root"); echo "SDK=$SDK (root=$root)"
-# 内核 commit：依次尝试常见内核目录（非内核工程则跳过）
+echo "数据仓已有子目录:"; ls -1 "$DEVNOTES_DIR" 2>/dev/null | grep -vE '^(index\.md|README.*|\.git.*)$' || true
+echo "建议 SDK 名(工程根目录名,仅供参考): $(basename "$root")"
+# 内核 commit
 for k in "$root"/kernel "$root"/kernel-* ; do
-  [ -d "$k/.git" ] && (cd "$k" && echo "kernel $(basename $k) @ $(git rev-parse --short HEAD)") && break
+  [ -d "$k/.git" ] && (cd "$k" && echo "kernel @ $(git rev-parse --short HEAD)") && break
 done
 # 若是 Rockchip 风格 SDK，顺带探测当前板型（其它 SDK 无此文件，自然跳过）
 cat "$root"/device/.BoardConfig.mk 2>/dev/null | grep -iE "DEFCONFIG|TARGET_PRODUCT" || true
 ```
 
-识别不出工程根就退回用 `basename $PWD` 并**让用户确认 SDK 名**。不同 SDK 的内核目录名/构建系统不同,探测不到的字段退回问用户,别瞎填。
+**问用户要 `$SDK`**:展示上面"已有子目录"和"建议名",让用户选一个已有的、或输入新的。用户给定后才记为 `$SDK`。其余探测不到的字段(板型/SDK 基线/复现命令等)同样退回问用户,别瞎填。
 
 ### 2. 向用户收集填不出来的信息
 
