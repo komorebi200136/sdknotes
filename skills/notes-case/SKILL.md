@@ -6,8 +6,8 @@ description: >-
   archive, or "建 case / 记一下 / 归档" a bug they're chasing or a feature they're bringing up —
   in ANY SDK or codebase, regardless of directory layout — phrases like "新建一个 case",
   "把这个 bug 记到 notes", "记录这个问题", "归档这次调试", "建个 feature case", or when they paste
-  a symptom/log and ask to start tracking it. Also use to CLOSE a case (mark done, move to done/,
-  commit+push). This skill auto-detects the current project/SDK, gathers complete reproducible info
+  a symptom/log and ask to start tracking it. Also use to UPDATE an existing case (append new
+  findings/logs/prompts to it), or to CLOSE a case (mark done, move to done/, commit+push). This skill auto-detects the current project/SDK, gathers complete reproducible info
   (SoC/board, SDK baseline, kernel commit, relevant files, repro command), writes a filled-in
   case.md from the bundled template, registers it in the data repo's index, and reminds about
   commit back-links. Prefer this over hand-writing notes files so nothing important (especially env)
@@ -72,6 +72,13 @@ cat "$root"/device/.BoardConfig.mk 2>/dev/null | grep -iE "DEFCONFIG|TARGET_PROD
 
 ### 3. 生成目录并写 case.md
 
+先查重(避免重复建或覆盖同名):
+```bash
+ls "$DEVNOTES_DIR/$SDK/active/" 2>/dev/null
+grep -i "<现象关键词>" "$DEVNOTES_DIR/index.md" 2>/dev/null || true
+```
+若已有同名或明显相关的 case,先问用户:是「更新已有」(转下方"更新现有 case")还是确实新建。
+
 目录名: `bug-<现象>-<根因关键词>` 或 `feat-<模块>-<短描述>`,小写中划线、带可检索词。
 
 ```bash
@@ -86,7 +93,7 @@ mkdir -p "$DEVNOTES_DIR/$SDK/active/<目录名>/logs"
 
 ### 5. 登记 index.md
 
-在 `$DEVNOTES_DIR/index.md` 表格追加一行(表尾空行之前):
+在 `$DEVNOTES_DIR/index.md` 表格**最后一个数据行之后**追加一行(不要依赖表尾空行——它可能已被删):
 
 ```
 | [<目录名>](<sdk>/active/<目录名>/case.md) | <SoC> | <板型/SDK> | bug/feature | active | <kernel@commit> | <一句话现状> |
@@ -96,6 +103,27 @@ mkdir -p "$DEVNOTES_DIR/$SDK/active/<目录名>/logs"
 ### 6. 提醒回链(通用坑)
 
 很多 SDK 顶层是 repo 工具聚合、非单一 git 仓。告诉用户:改动提交时,在对应子仓库(kernel 等)的 commit message 写一行 `Refs notes/<目录名>`,以后 `cd kernel && git log --grep="notes/<目录名>"` 能找回。
+
+### 7. 提交备份(避免误删丢失)
+
+新建完就提交一次,别等到收尾:
+```bash
+cd "$DEVNOTES_DIR" && git add -A && git commit -q -m "<sdk>: new <目录名> — <一句话现状>"
+git push 2>/dev/null || echo "（未配 remote，已本地提交;配好 remote 后再 push）"
+```
+
+## 更新现有 case(边查边补)
+
+调试是持续的——中途有了新 findings、新日志、有效 prompt,随时往已有 case 追加。用户说"把这个补到 case""更新那个 xxx 的 case""这条加到 findings"时:
+
+1. **定位 case**: 扫 `$DEVNOTES_DIR/$SDK/active/` 与 `index.md`;不唯一就列出让用户选,别猜。
+2. **只更新相关段,不重写整个文件**:
+   - 新结论 → findings 段;关键决策 → decisions 段;改动落点/commit → patch 段
+   - 有效的范围限定 prompt → prompts 段
+   - 大段日志/diff → 写进该 case 的 `logs/`,在「附件」段加一行引用
+   - 复现状态有变(偶发→稳定复现/已解决)就同步顶部字段
+3. 若进展改变了 index 的"一句话现状",同步更新 index 那一行。
+4. **提交备份**: `cd "$DEVNOTES_DIR" && git add -A && git commit -q -m "<sdk>: update <目录名> — <补了什么>"`。
 
 ## 收尾一个 case(标记完成 + 备份)
 
